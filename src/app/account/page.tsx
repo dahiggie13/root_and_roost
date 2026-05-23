@@ -5,8 +5,9 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase-client'
 
+const supabase = createClient()
+
 export default function AccountPage() {
-  const supabase = createClient()
   const router = useRouter()
 
   const [userId, setUserId] = useState('')
@@ -22,41 +23,44 @@ export default function AccountPage() {
 
   useEffect(() => {
     async function loadAccount() {
-      const { data } = await supabase.auth.getSession()
+      try {
+        const { data } = await supabase.auth.getSession()
 
-      if (!data.session) {
-        router.push('/login')
-        return
+        if (!data.session) {
+          router.push('/login')
+          return
+        }
+
+        const user = data.session.user
+
+        setUserId(user.id)
+        setEmail(user.email || '')
+
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('username, homestead_name, weather_location, profile_image_url')
+          .eq('id', user.id)
+          .maybeSingle()
+
+        if (error) {
+          console.log(error)
+          alert(error.message)
+          return
+        }
+
+        if (profile) {
+          setUsername(profile.username || '')
+          setHomesteadName(profile.homestead_name || '')
+          setWeatherLocation(profile.weather_location || '')
+          setProfileImageUrl(profile.profile_image_url || '')
+        }
+      } finally {
+        setLoading(false)
       }
-
-      const user = data.session.user
-
-      setUserId(user.id)
-      setEmail(user.email || '')
-
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('username, homestead_name, weather_location, profile_image_url')
-        .eq('id', user.id)
-        .single()
-
-      if (error && error.code !== 'PGRST116') {
-        console.log(error)
-        alert(error.message)
-      }
-
-      if (profile) {
-        setUsername(profile.username || '')
-        setHomesteadName(profile.homestead_name || '')
-        setWeatherLocation(profile.weather_location || '')
-        setProfileImageUrl(profile.profile_image_url || '')
-      }
-
-      setLoading(false)
     }
 
     loadAccount()
-  }, [router, supabase.auth])
+  }, [router])
 
   async function uploadProfileImage() {
     if (!profileImageFile || !userId) {

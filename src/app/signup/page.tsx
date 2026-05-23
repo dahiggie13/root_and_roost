@@ -2,10 +2,10 @@
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase-client'
+import Link from 'next/link'
 
 export default function SignupPage() {
   const supabase = createClient()
-const [userId, setUserId] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
 
@@ -23,11 +23,12 @@ const [userId, setUserId] = useState('')
   }
 
   return (
-    <div className="p-8">
-      <h1 className="text-2xl mb-4">Sign Up</h1>
+    <div className="mx-auto max-w-md">
+      <div className="bg-white p-4 rounded-xl shadow">
+      <h1 className="text-2xl font-bold mb-4">Create Account</h1>
 
       <input
-        className="border p-2 block mb-4"
+        className="border p-2 w-full mb-4"
         type="email"
         placeholder="Email"
         value={email}
@@ -35,7 +36,7 @@ const [userId, setUserId] = useState('')
       />
 
       <input
-        className="border p-2 block mb-4"
+        className="border p-2 w-full mb-4"
         type="password"
         placeholder="Password"
         value={password}
@@ -43,11 +44,19 @@ const [userId, setUserId] = useState('')
       />
 
       <button
-        className="bg-black text-white px-4 py-2"
+        className="bg-black text-white px-4 py-2 rounded w-full"
         onClick={handleSignup}
       >
         Create Account
       </button>
+
+      <p className="mt-4 text-sm text-gray-600">
+        Already have an account?{' '}
+        <Link href="/login" className="text-blue-600 underline">
+          Log in
+        </Link>
+      </p>
+      </div>
     </div>
   )
 }

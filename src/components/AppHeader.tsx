@@ -24,8 +24,9 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase-client'
 
+const supabase = createClient()
+
 export default function AppHeader() {
-  const supabase = createClient()
   const router = useRouter()
 
   const [email, setEmail] = useState<string | null>(null)
@@ -68,7 +69,7 @@ export default function AppHeader() {
     return () => {
       subscription.unsubscribe()
     }
-  }, [supabase.auth])
+  }, [])
 
   async function loadNotifications(userId: string) {
     const today = new Date()
