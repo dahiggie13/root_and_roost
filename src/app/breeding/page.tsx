@@ -35,6 +35,7 @@ type BroodyRecord = {
   id: string
   hen_animal_id: string | null
   started_sitting_date: string | null
+  ended_sitting_date: string | null
   egg_count: number | null
   egg_type: string | null
   live_chicks_hatched: number | null
@@ -78,6 +79,7 @@ export default function BreedingPage() {
   const [showBroodyForm, setShowBroodyForm] = useState(false)
   const [broodyHenId, setBroodyHenId] = useState('')
   const [broodyStartDate, setBroodyStartDate] = useState('')
+  const [broodyEndDate, setBroodyEndDate] = useState('')
   const [broodyEggCount, setBroodyEggCount] = useState('')
   const [broodyEggType, setBroodyEggType] = useState('real')
   const [broodyLiveHatched, setBroodyLiveHatched] = useState('')
@@ -89,6 +91,7 @@ export default function BreedingPage() {
   const [broodyEditForm, setBroodyEditForm] = useState({
     hen_animal_id: '',
     started_sitting_date: '',
+    ended_sitting_date: '',
     egg_count: '',
     egg_type: 'real',
     live_chicks_hatched: '',
@@ -255,6 +258,23 @@ export default function BreedingPage() {
     fetchProjects()
   }
 
+  async function updateProjectStatus(id: string, nextStatus: string) {
+    const { error } = await supabase
+      .from('breeding_projects')
+      .update({
+        status: nextStatus,
+      })
+      .eq('id', id)
+
+    if (error) {
+      console.log(error)
+      alert(error.message)
+      return
+    }
+
+    fetchProjects()
+  }
+
   async function addBroodyRecord() {
     const { error } = await supabase
       .from('broody_records')
@@ -263,6 +283,7 @@ export default function BreedingPage() {
           user_id: userId,
           hen_animal_id: broodyHenId || null,
           started_sitting_date: broodyStartDate || null,
+          ended_sitting_date: broodyEndDate || null,
           egg_count: broodyEggCount ? Number(broodyEggCount) : 0,
           egg_type: broodyEggType,
           live_chicks_hatched: broodyLiveHatched ? Number(broodyLiveHatched) : 0,
@@ -281,6 +302,7 @@ export default function BreedingPage() {
 
     setBroodyHenId('')
     setBroodyStartDate('')
+    setBroodyEndDate('')
     setBroodyEggCount('')
     setBroodyEggType('real')
     setBroodyLiveHatched('')
@@ -298,6 +320,7 @@ export default function BreedingPage() {
       .update({
         hen_animal_id: broodyEditForm.hen_animal_id || null,
         started_sitting_date: broodyEditForm.started_sitting_date || null,
+        ended_sitting_date: broodyEditForm.ended_sitting_date || null,
         egg_count: broodyEditForm.egg_count ? Number(broodyEditForm.egg_count) : 0,
         egg_type: broodyEditForm.egg_type,
         live_chicks_hatched: broodyEditForm.live_chicks_hatched
@@ -337,6 +360,23 @@ export default function BreedingPage() {
     fetchBroodyRecords()
   }
 
+  async function updateBroodyStatus(id: string, nextStatus: string) {
+    const { error } = await supabase
+      .from('broody_records')
+      .update({
+        status: nextStatus,
+      })
+      .eq('id', id)
+
+    if (error) {
+      console.log(error)
+      alert(error.message)
+      return
+    }
+
+    fetchBroodyRecords()
+  }
+
   useEffect(() => {
     async function loadUserData() {
       const { data } = await supabase.auth.getUser()
@@ -363,11 +403,11 @@ export default function BreedingPage() {
     return 'Unnamed Animal'
   }
 
-  function getDaysSitting(startDate: string | null) {
+  function getDaysSitting(startDate: string | null, endDate: string | null = null) {
     if (!startDate) return 'Unknown'
 
     const start = new Date(`${startDate}T00:00:00`)
-    const today = new Date()
+    const today = endDate ? new Date(`${endDate}T00:00:00`) : new Date()
     const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate())
     const todayDay = new Date(today.getFullYear(), today.getMonth(), today.getDate())
     const difference = todayDay.getTime() - startDay.getTime()
@@ -504,6 +544,7 @@ export default function BreedingPage() {
             onChange={(e) => setStatus(e.target.value)}
           >
             <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
             <option value="completed">Completed</option>
             <option value="cancelled">Cancelled</option>
           </select>
@@ -608,6 +649,7 @@ export default function BreedingPage() {
                   onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
                 >
                   <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
                   <option value="completed">Completed</option>
                   <option value="cancelled">Cancelled</option>
                 </select>
@@ -636,6 +678,18 @@ export default function BreedingPage() {
               onClick={() => deleteProject(project.id)}
             >
               Delete
+            </button>
+
+            <button
+              className="border px-3 py-1 rounded mt-3 ml-2"
+              onClick={() =>
+                updateProjectStatus(
+                  project.id,
+                  project.status === 'active' ? 'inactive' : 'active'
+                )
+              }
+            >
+              {project.status === 'active' ? 'Mark Inactive' : 'Mark Active'}
             </button>
 
             {editingId === project.id ? (
@@ -732,6 +786,19 @@ export default function BreedingPage() {
             />
           </div>
 
+          <div className="mb-3">
+            <label className="block font-medium mb-1">
+              Ended Sitting
+            </label>
+
+            <input
+              className="border p-2 w-full"
+              type="date"
+              value={broodyEndDate}
+              onChange={(e) => setBroodyEndDate(e.target.value)}
+            />
+          </div>
+
           <input
             className="border p-2 w-full mb-3"
             type="number"
@@ -781,6 +848,7 @@ export default function BreedingPage() {
             onChange={(e) => setBroodyStatus(e.target.value)}
           >
             <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
             <option value="hatched">Hatched</option>
             <option value="adoption">Adoption Attempt</option>
             <option value="completed">Completed</option>
@@ -838,6 +906,18 @@ export default function BreedingPage() {
                       setBroodyEditForm({
                         ...broodyEditForm,
                         started_sitting_date: e.target.value,
+                      })
+                    }
+                  />
+
+                  <input
+                    className="border p-2"
+                    type="date"
+                    value={broodyEditForm.ended_sitting_date}
+                    onChange={(e) =>
+                      setBroodyEditForm({
+                        ...broodyEditForm,
+                        ended_sitting_date: e.target.value,
                       })
                     }
                   />
@@ -906,6 +986,7 @@ export default function BreedingPage() {
                     }
                   >
                     <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
                     <option value="hatched">Hatched</option>
                     <option value="adoption">Adoption Attempt</option>
                     <option value="completed">Completed</option>
@@ -933,14 +1014,21 @@ export default function BreedingPage() {
                     </span>
                   </div>
 
-                  <p>Started Sitting: {record.started_sitting_date || 'Not set'}</p>
-                  <p>Days Sitting: {getDaysSitting(record.started_sitting_date)}</p>
-                  <p>Expected Hatch: {getExpectedHatchDate(record.started_sitting_date)}</p>
-                  <p>Eggs: {record.egg_count || 0} ({record.egg_type || 'unknown'})</p>
-                  <p>Live Chicks Hatched: {record.live_chicks_hatched || 0}</p>
-                  <p>Chicks Given: {record.chicks_given || 0}</p>
-                  <p>Chicks Accepted: {record.chicks_accepted || 0}</p>
-                  <p>Notes: {record.notes || 'None'}</p>
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-sm sm:grid-cols-4">
+                    <p>Days: {getDaysSitting(record.started_sitting_date, record.ended_sitting_date)}</p>
+                    <p>Eggs: {record.egg_count || 0}</p>
+                    <p>Hatched: {record.live_chicks_hatched || 0}</p>
+                    <p>Accepted: {record.chicks_accepted || 0}</p>
+                  </div>
+
+                  <p className="mt-2 text-sm text-gray-600">
+                    Started: {record.started_sitting_date || 'Not set'}
+                    {record.ended_sitting_date ? ` | Ended: ${record.ended_sitting_date}` : ''}
+                  </p>
+
+                  <p className="text-sm text-gray-600">
+                    Expected: {getExpectedHatchDate(record.started_sitting_date)}
+                  </p>
                 </div>
               )}
 
@@ -950,6 +1038,18 @@ export default function BreedingPage() {
                   onClick={() => deleteBroodyRecord(record.id)}
                 >
                   Delete
+                </button>
+
+                <button
+                  className="border px-3 py-1 rounded"
+                  onClick={() =>
+                    updateBroodyStatus(
+                      record.id,
+                      record.status === 'active' ? 'inactive' : 'active'
+                    )
+                  }
+                >
+                  {record.status === 'active' ? 'Mark Inactive' : 'Mark Active'}
                 </button>
 
                 {editingBroodyId === record.id ? (
@@ -976,6 +1076,7 @@ export default function BreedingPage() {
                       setBroodyEditForm({
                         hen_animal_id: record.hen_animal_id || '',
                         started_sitting_date: record.started_sitting_date || '',
+                        ended_sitting_date: record.ended_sitting_date || '',
                         egg_count: record.egg_count?.toString() || '',
                         egg_type: record.egg_type || 'real',
                         live_chicks_hatched: record.live_chicks_hatched?.toString() || '',
@@ -989,6 +1090,13 @@ export default function BreedingPage() {
                     Edit
                   </button>
                 )}
+
+                <Link
+                  href={`/breeding/broody/${record.id}`}
+                  className="bg-black text-white px-3 py-1 rounded"
+                >
+                  View
+                </Link>
               </div>
             </div>
           ))
