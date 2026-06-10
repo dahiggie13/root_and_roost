@@ -72,6 +72,18 @@ type BreedingProject = {
   chicks_hatched: number | null
 }
 
+type BroodyRecord = {
+  id: string
+  started_sitting_date: string | null
+  ended_sitting_date: string | null
+  egg_count: number | null
+  egg_type: string | null
+  live_chicks_hatched: number | null
+  chicks_given: number | null
+  chicks_accepted: number | null
+  status: string | null
+}
+
 export default function AnimalDetailPage() {
   const params = useParams()
   const animalId = params.id as string
@@ -82,6 +94,7 @@ const [healthRecords, setHealthRecords] = useState<HealthRecord[]>([])
   const [sales, setSales] = useState<Sale[]>([])
   const [loading, setLoading] = useState(true)
   const [breedingProjects, setBreedingProjects] = useState<BreedingProject[]>([])
+  const [broodyRecords, setBroodyRecords] = useState<BroodyRecord[]>([])
   const [editing, setEditing] = useState(false)
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [editForm, setEditForm] = useState({
@@ -192,6 +205,25 @@ async function fetchBreedingProjects(currentUserId = userId) {
   }
 
   setBreedingProjects(data || [])
+}
+
+async function fetchBroodyRecords(currentUserId = userId) {
+  if (!currentUserId || !animalId) return
+
+  const { data, error } = await supabase
+    .from('broody_records')
+    .select('*')
+    .eq('user_id', currentUserId)
+    .eq('hen_animal_id', animalId)
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    console.log(error)
+    setBroodyRecords([])
+    return
+  }
+
+  setBroodyRecords(data || [])
 }
 
 async function fetchCoops(currentUserId = userId) {
@@ -314,6 +346,7 @@ async function updateAnimal() {
       await fetchSales(data.user.id)
       await fetchHealthRecords(data.user.id)
       await fetchBreedingProjects(data.user.id)
+      await fetchBroodyRecords(data.user.id)
       await fetchCoops(data.user.id)
 
       setLoading(false)
@@ -343,6 +376,27 @@ async function updateAnimal() {
   const totalSales = sales.reduce((sum, sale) => {
     return sum + Number(sale.price || 0)
   }, 0)
+
+  function getDaysSitting(startDate: string | null, endDate: string | null = null) {
+    if (!startDate) return 'Unknown'
+
+    const start = new Date(`${startDate}T00:00:00`)
+    const end = endDate ? new Date(`${endDate}T00:00:00`) : new Date()
+    const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate())
+    const endDay = new Date(end.getFullYear(), end.getMonth(), end.getDate())
+    const difference = endDay.getTime() - startDay.getTime()
+
+    return Math.max(0, Math.floor(difference / 86400000)).toString()
+  }
+
+  function getExpectedHatchDate(startDate: string | null) {
+    if (!startDate) return 'Unknown'
+
+    const hatchDate = new Date(`${startDate}T00:00:00`)
+    hatchDate.setDate(hatchDate.getDate() + 21)
+
+    return hatchDate.toISOString().split('T')[0]
+  }
 
   if (loading) {
     return <p>Loading animal...</p>
@@ -573,6 +627,7 @@ async function updateAnimal() {
   </h2>
 
   <p>Total Breeding Projects: {breedingProjects.length}</p>
+  <p>Total Broody Records: {broodyRecords.length}</p>
 </div>
 
       <h2 className="text-2xl font-bold mb-4">
@@ -601,76 +656,114 @@ async function updateAnimal() {
             </div>
           ))
         )}
+      </div>
+
       <h2 className="text-2xl font-bold mt-6 mb-4">
-  Health Records
-</h2>
+        Health Records
+      </h2>
 
-<div className="grid gap-4">
-  {healthRecords.length === 0 ? (
-    <p>No health records linked to this animal yet.</p>
-  ) : (
-    healthRecords.map((record) => (
-      <div
-        key={record.id}
-        className="bg-white p-4 rounded-xl shadow"
-      >
-        <h3 className="text-xl font-bold">
-          {record.record_type}
-        </h3>
+      <div className="grid gap-4">
+        {healthRecords.length === 0 ? (
+          <p>No health records linked to this animal yet.</p>
+        ) : (
+          healthRecords.map((record) => (
+            <div
+              key={record.id}
+              className="bg-white p-4 rounded-xl shadow"
+            >
+              <h3 className="text-xl font-bold">
+                {record.record_type}
+              </h3>
 
-        <p>Date: {record.record_date || 'Not set'}</p>
-        <p>Treatment: {record.treatment || 'None'}</p>
-        <p>Provider: {record.provider || 'None'}</p>
-        <p>Cost: ${Number(record.cost || 0).toFixed(2)}</p>
-        <p>Notes: {record.notes || 'None'}</p>
+              <p>Date: {record.record_date || 'Not set'}</p>
+              <p>Treatment: {record.treatment || 'None'}</p>
+              <p>Provider: {record.provider || 'None'}</p>
+              <p>Cost: ${Number(record.cost || 0).toFixed(2)}</p>
+              <p>Notes: {record.notes || 'None'}</p>
+            </div>
+          ))
+        )}
       </div>
-    ))
-  )}
-</div>
-     
-    <h2 className="text-2xl font-bold mt-6 mb-4">
-  Breeding History
-</h2>
 
-<div className="grid gap-4">
-  {breedingProjects.length === 0 ? (
-    <p>No breeding projects linked to this animal yet.</p>
-  ) : (
-    breedingProjects.map((project) => (
-      <div
-        key={project.id}
-        className="bg-white p-4 rounded-xl shadow"
-      >
-        <h3 className="text-xl font-bold">
-          {project.project_name}
-        </h3>
+      <h2 className="text-2xl font-bold mt-6 mb-4">
+        Breeding History
+      </h2>
 
-        <p>Status: {project.status || 'Unknown'}</p>
-        <p>
-          Role:{' '}
-          {project.male_animal_id === animalId ? 'Male' : 'Female'}
-        </p>
-        <p>
-          Male: {project.male?.name || project.male?.band_number || 'Not selected'}
-        </p>
-        <p>
-          Female: {project.female?.name || project.female?.band_number || 'Not selected'}
-        </p>
-        <p>Expected Hatch: {project.expected_hatch_date || 'Not set'}</p>
-        <p>Actual Hatch: {project.actual_hatch_date || 'Not set'}</p>
-        <p>Chicks Hatched: {project.chicks_hatched || 0}</p>
+      <div className="grid gap-4">
+        {breedingProjects.length === 0 && broodyRecords.length === 0 ? (
+          <p>No breeding or broody records linked to this animal yet.</p>
+        ) : (
+          <>
+            {breedingProjects.map((project) => (
+              <div
+                key={project.id}
+                className="bg-white p-4 rounded-xl shadow"
+              >
+                <h3 className="text-xl font-bold">
+                  {project.project_name}
+                </h3>
 
-        <Link
-  href={`/breeding/${project.id}`}
-  className="bg-black text-white px-3 py-1 rounded mt-3 inline-block"
->
-  View Breeding Project
-</Link>
-      </div>
-    ))
-  )}
-</div> 
-     
+                <p>Status: {project.status || 'Unknown'}</p>
+                <p>
+                  Role:{' '}
+                  {project.male_animal_id === animalId ? 'Male' : 'Female'}
+                </p>
+                <p>
+                  Male: {project.male?.name || project.male?.band_number || 'Not selected'}
+                </p>
+                <p>
+                  Female: {project.female?.name || project.female?.band_number || 'Not selected'}
+                </p>
+                <p>Expected Hatch: {project.expected_hatch_date || 'Not set'}</p>
+                <p>Actual Hatch: {project.actual_hatch_date || 'Not set'}</p>
+                <p>Chicks Hatched: {project.chicks_hatched || 0}</p>
+
+                <Link
+                  href={`/breeding/${project.id}`}
+                  className="bg-black text-white px-3 py-1 rounded mt-3 inline-block"
+                >
+                  View Breeding Project
+                </Link>
+              </div>
+            ))}
+
+            {broodyRecords.map((record) => (
+              <div
+                key={record.id}
+                className="bg-white p-4 rounded-xl shadow"
+              >
+                <div className="mb-2 flex items-start justify-between gap-3">
+                  <h3 className="text-xl font-bold">
+                    Broody Hen Record
+                  </h3>
+
+                  <span className="rounded-full bg-[#f4ead7] px-3 py-1 text-sm capitalize">
+                    {record.status || 'active'}
+                  </span>
+                </div>
+
+                <p>Started Sitting: {record.started_sitting_date || 'Not set'}</p>
+                <p>Ended Sitting: {record.ended_sitting_date || 'Still sitting'}</p>
+                <p>
+                  Days Sitting:{' '}
+                  {getDaysSitting(record.started_sitting_date, record.ended_sitting_date)}
+                </p>
+                <p>Expected Hatch: {getExpectedHatchDate(record.started_sitting_date)}</p>
+                <p>Eggs: {record.egg_count || 0} ({record.egg_type || 'unknown'})</p>
+                <p>Live Chicks Hatched: {record.live_chicks_hatched || 0}</p>
+                <p>Chicks Given: {record.chicks_given || 0}</p>
+                <p>Chicks Accepted: {record.chicks_accepted || 0}</p>
+
+                <Link
+                  href={`/breeding/broody/${record.id}`}
+                  className="bg-black text-white px-3 py-1 rounded mt-3 inline-block"
+                >
+                  View Broody Record
+                </Link>
+              </div>
+            ))}
+          </>
+        )}
       </div>
     </div>
   )
