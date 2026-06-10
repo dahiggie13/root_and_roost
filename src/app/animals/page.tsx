@@ -1,5 +1,8 @@
 'use client'
 
+/* eslint-disable @next/next/no-img-element */
+/* eslint-disable react-hooks/exhaustive-deps */
+
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-client'
 import Link from 'next/link'
@@ -7,11 +10,32 @@ import { Filter } from 'lucide-react'
 
 const supabase = createClient()
 
+type Coop = {
+  id: string
+  name: string | null
+}
+
+type Animal = {
+  id: string
+  name: string | null
+  animal_type: string | null
+  animal_subtype: string | null
+  breed: string | null
+  gender: string | null
+  color: string | null
+  band_number: string | null
+  notes: string | null
+  coop_id: string | null
+  birth_date: string | null
+  image_url: string | null
+  coops?: Coop | null
+}
+
 export default function AnimalsPage() {
 
   const [searchTerm, setSearchTerm] = useState('')
 const [userId, setUserId] = useState('')
-  const [animals, setAnimals] = useState<any[]>([])
+  const [animals, setAnimals] = useState<Animal[]>([])
 
   const [name, setName] = useState('')
 
@@ -37,7 +61,7 @@ const [filterType, setFilterType] = useState('all')
 
 const [showFilters, setShowFilters] = useState(false)
 
-const [coops, setCoops] = useState<any[]>([])
+const [coops, setCoops] = useState<Coop[]>([])
 
 const [coopId, setCoopId] = useState('')
 
@@ -119,9 +143,9 @@ async function uploadAnimalImage(file: File | null) {
 
     try {
       uploadedImageUrl = await uploadAnimalImage(animalImageFile)
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.log(error)
-      alert(error.message)
+      alert(error instanceof Error ? error.message : 'Image upload failed')
       return
     }
 
@@ -164,19 +188,26 @@ setBirthDate('')
     }
   }
 
-  useEffect(() => {async function deleteAnimal(id: string) {
+async function fetchCoops(currentUserId = userId) {
+  if (!currentUserId) {
+    setCoops([])
+    return
+  }
 
-  const { error } = await supabase
-    .from('animals')
-    .delete()
-    .eq('id', id)
+  const { data, error } = await supabase
+    .from('coops')
+    .select('*')
+    .eq('user_id', currentUserId)
+    .order('name')
 
   if (error) {
     console.log(error)
   } else {
-    fetchAnimals()
+    setCoops(data || [])
   }
 }
+
+  useEffect(() => {
     async function loadUserData() {
       const { data } = await supabase.auth.getUser()
 
@@ -197,9 +228,9 @@ async function updateAnimal(id: string) {
     if (editImageFiles[id]) {
       uploadedImageUrl = await uploadAnimalImage(editImageFiles[id])
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.log(error)
-    alert(error.message)
+    alert(error instanceof Error ? error.message : 'Image upload failed')
     return
   }
 
@@ -250,26 +281,7 @@ async function deleteAnimal(id: string) {
   }
 }
 
-async function fetchCoops(currentUserId = userId) {
-  if (!currentUserId) {
-    setCoops([])
-    return
-  }
-
-  const { data, error } = await supabase
-    .from('coops')
-    .select('*')
-    .eq('user_id', currentUserId)
-    .order('name')
-
-  if (error) {
-    console.log(error)
-  } else {
-    setCoops(data)
-  }
-}
-
-function getAnimalDisplayName(animal: any) {
+function getAnimalDisplayName(animal: Animal) {
   if (animal.name) {
     return animal.name
   }

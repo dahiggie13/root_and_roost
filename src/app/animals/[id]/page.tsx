@@ -1,5 +1,8 @@
 'use client'
 
+/* eslint-disable @next/next/no-img-element */
+/* eslint-disable react-hooks/exhaustive-deps */
+
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
@@ -7,15 +10,93 @@ import { createClient } from '@/lib/supabase-client'
 
 const supabase = createClient()
 
+type Coop = {
+  id: string
+  name: string | null
+  location?: string | null
+}
+
+type AnimalDetail = {
+  id: string
+  name: string | null
+  animal_type: string | null
+  animal_subtype: string | null
+  breed: string | null
+  gender: string | null
+  color: string | null
+  band_number: string | null
+  birth_date: string | null
+  coop_id: string | null
+  notes: string | null
+  image_url: string | null
+  coops?: Coop | null
+}
+
+type Sale = {
+  id: string
+  item_name: string | null
+  sale_type: string | null
+  quantity: number | null
+  price: number | string | null
+  sale_date: string | null
+  buyer_name: string | null
+  notes: string | null
+}
+
+type HealthRecord = {
+  id: string
+  record_type: string | null
+  record_date: string | null
+  treatment: string | null
+  provider: string | null
+  cost: number | string | null
+  notes: string | null
+}
+
+type AnimalRef = {
+  id: string
+  name: string | null
+  band_number: string | null
+}
+
+type BreedingProject = {
+  id: string
+  project_name: string | null
+  status: string | null
+  male_animal_id: string | null
+  female_animal_id: string | null
+  male?: AnimalRef | null
+  female?: AnimalRef | null
+  expected_hatch_date: string | null
+  actual_hatch_date: string | null
+  chicks_hatched: number | null
+}
+
 export default function AnimalDetailPage() {
   const params = useParams()
   const animalId = params.id as string
-const [healthRecords, setHealthRecords] = useState<any[]>([])
+const [healthRecords, setHealthRecords] = useState<HealthRecord[]>([])
   const [userId, setUserId] = useState('')
-  const [animal, setAnimal] = useState<any>(null)
-  const [sales, setSales] = useState<any[]>([])
+  const [animal, setAnimal] = useState<AnimalDetail | null>(null)
+  const [coops, setCoops] = useState<Coop[]>([])
+  const [sales, setSales] = useState<Sale[]>([])
   const [loading, setLoading] = useState(true)
-  const [breedingProjects, setBreedingProjects] = useState<any[]>([])
+  const [breedingProjects, setBreedingProjects] = useState<BreedingProject[]>([])
+  const [editing, setEditing] = useState(false)
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [editForm, setEditForm] = useState({
+    name: '',
+    animal_type: '',
+    animal_subtype: '',
+    breed: '',
+    gender: '',
+    color: '',
+    band_number: '',
+    birth_date: '',
+    coop_id: '',
+    notes: '',
+    image_url: '',
+  })
 
   async function fetchAnimal(currentUserId = userId) {
     if (!currentUserId || !animalId) return
@@ -113,6 +194,114 @@ async function fetchBreedingProjects(currentUserId = userId) {
   setBreedingProjects(data || [])
 }
 
+async function fetchCoops(currentUserId = userId) {
+  if (!currentUserId) {
+    setCoops([])
+    return
+  }
+
+  const { data, error } = await supabase
+    .from('coops')
+    .select('*')
+    .eq('user_id', currentUserId)
+    .order('name')
+
+  if (error) {
+    console.log(error)
+    setCoops([])
+    return
+  }
+
+  setCoops(data || [])
+}
+
+async function uploadAnimalImage(file: File | null) {
+  if (!file || !userId) {
+    return null
+  }
+
+  const fileExt = file.name.split('.').pop()
+  const filePath = `${userId}/animals/${Date.now()}.${fileExt}`
+
+  const { error } = await supabase.storage
+    .from('animal-images')
+    .upload(filePath, file)
+
+  if (error) {
+    throw error
+  }
+
+  const { data } = supabase.storage
+    .from('animal-images')
+    .getPublicUrl(filePath)
+
+  return data.publicUrl
+}
+
+function startEditing() {
+  if (!animal) return
+
+  setEditForm({
+    name: animal.name || '',
+    animal_type: animal.animal_type === 'chicken' ? 'poultry' : animal.animal_type || '',
+    animal_subtype:
+      animal.animal_subtype ||
+      (animal.animal_type === 'chicken' ? 'chicken' : ''),
+    breed: animal.breed || '',
+    gender: animal.gender || '',
+    color: animal.color || '',
+    band_number: animal.band_number || '',
+    birth_date: animal.birth_date || '',
+    coop_id: animal.coop_id || '',
+    notes: animal.notes || '',
+    image_url: animal.image_url || '',
+  })
+  setImageFile(null)
+  setEditing(true)
+}
+
+async function updateAnimal() {
+  let uploadedImageUrl: string | null = editForm.image_url || null
+
+  try {
+    if (imageFile) {
+      uploadedImageUrl = await uploadAnimalImage(imageFile)
+    }
+  } catch (error: unknown) {
+    console.log(error)
+    alert(error instanceof Error ? error.message : 'Image upload failed')
+    return
+  }
+
+  const { error } = await supabase
+    .from('animals')
+    .update({
+      name: editForm.name || null,
+      animal_type: editForm.animal_type || null,
+      animal_subtype: editForm.animal_type === 'poultry' ? editForm.animal_subtype : null,
+      breed: editForm.breed || null,
+      gender: editForm.gender || null,
+      color: editForm.color || null,
+      band_number: editForm.band_number || null,
+      birth_date: editForm.birth_date || null,
+      coop_id: editForm.coop_id || null,
+      notes: editForm.notes || null,
+      image_url: uploadedImageUrl || null,
+    })
+    .eq('id', animalId)
+    .eq('user_id', userId)
+
+  if (error) {
+    console.log(error)
+    alert(error.message)
+    return
+  }
+
+  setEditing(false)
+  setImageFile(null)
+  fetchAnimal()
+}
+
   useEffect(() => {
     async function loadAnimalData() {
       const { data } = await supabase.auth.getUser()
@@ -125,6 +314,7 @@ async function fetchBreedingProjects(currentUserId = userId) {
       await fetchSales(data.user.id)
       await fetchHealthRecords(data.user.id)
       await fetchBreedingProjects(data.user.id)
+      await fetchCoops(data.user.id)
 
       setLoading(false)
     }
@@ -179,7 +369,7 @@ async function fetchBreedingProjects(currentUserId = userId) {
       </Link>
 
       <div className="bg-white p-4 rounded-xl shadow mt-4 mb-6">
-        {animal.image_url && (
+        {!editing && animal.image_url && (
           <img
             className="mb-4 h-48 w-full rounded-xl object-cover border"
             src={animal.image_url}
@@ -187,18 +377,177 @@ async function fetchBreedingProjects(currentUserId = userId) {
           />
         )}
 
-        <h1 className="text-3xl font-bold mb-2 capitalize">
-          {getAnimalDisplayName()}
-        </h1>
+        {editing ? (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <input
+              className="border p-2"
+              placeholder="Name"
+              value={editForm.name}
+              onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+            />
 
-        <p>Type: {animal.animal_type || 'Unknown'}</p>
-        <p>Breed: {animal.breed || 'Unknown'}</p>
-        <p>Gender: {animal.gender || 'Unknown'}</p>
-        <p>Color: {animal.color || 'Unknown'}</p>
-        <p>Band Number: {animal.band_number || 'None'}</p>
-        <p>Birth Date: {animal.birth_date || 'Unknown'}</p>
-        <p>Coop / Pasture: {animal.coops?.name || 'Not assigned'}</p>
-        <p>Notes: {animal.notes || 'None'}</p>
+            <select
+              className="border p-2"
+              value={editForm.animal_type}
+              onChange={(e) =>
+                setEditForm({
+                  ...editForm,
+                  animal_type: e.target.value,
+                  animal_subtype: e.target.value === 'poultry' ? editForm.animal_subtype : '',
+                })
+              }
+            >
+              <option value="">Select Animal Type</option>
+              <option value="poultry">Poultry</option>
+              <option value="goat">Goat</option>
+              <option value="sheep">Sheep</option>
+              <option value="cattle">Cattle</option>
+              <option value="pig">Pig</option>
+              <option value="horse">Horse</option>
+              <option value="bee">Bee</option>
+              <option value="other">Other</option>
+            </select>
+
+            {editForm.animal_type === 'poultry' && (
+              <select
+                className="border p-2"
+                value={editForm.animal_subtype}
+                onChange={(e) => setEditForm({ ...editForm, animal_subtype: e.target.value })}
+              >
+                <option value="">Select Poultry Type</option>
+                <option value="chicken">Chicken</option>
+                <option value="duck">Duck</option>
+                <option value="goose">Goose</option>
+                <option value="turkey">Turkey</option>
+                <option value="other">Other</option>
+              </select>
+            )}
+
+            <input
+              className="border p-2"
+              placeholder="Breed"
+              value={editForm.breed}
+              onChange={(e) => setEditForm({ ...editForm, breed: e.target.value })}
+            />
+
+            <select
+              className="border p-2"
+              value={editForm.gender}
+              onChange={(e) => setEditForm({ ...editForm, gender: e.target.value })}
+            >
+              <option value="">Select Gender</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="unknown">Unknown</option>
+            </select>
+
+            <input
+              className="border p-2"
+              placeholder="Color"
+              value={editForm.color}
+              onChange={(e) => setEditForm({ ...editForm, color: e.target.value })}
+            />
+
+            <input
+              className="border p-2"
+              placeholder="Band Number"
+              value={editForm.band_number}
+              onChange={(e) => setEditForm({ ...editForm, band_number: e.target.value })}
+            />
+
+            <div>
+              <label className="block font-medium mb-1">
+                Birth Date
+              </label>
+
+              <input
+                className="border p-2 w-full"
+                type="date"
+                value={editForm.birth_date}
+                onChange={(e) => setEditForm({ ...editForm, birth_date: e.target.value })}
+              />
+            </div>
+
+            <select
+              className="border p-2"
+              value={editForm.coop_id}
+              onChange={(e) => setEditForm({ ...editForm, coop_id: e.target.value })}
+            >
+              <option value="">No Coop / Pasture Assigned</option>
+
+              {coops.map((coop) => (
+                <option key={coop.id} value={coop.id}>
+                  {coop.name}
+                </option>
+              ))}
+            </select>
+
+            <textarea
+              className="border p-2 sm:col-span-2"
+              placeholder="Notes"
+              value={editForm.notes}
+              onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+            />
+
+            {editForm.image_url && (
+              <img
+                className="h-24 w-24 rounded-lg object-cover border sm:col-span-2"
+                src={editForm.image_url}
+                alt={editForm.name || 'Animal'}
+              />
+            )}
+
+            <input
+              className="border p-2 sm:col-span-2"
+              type="file"
+              accept="image/*"
+              onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+            />
+
+            <div className="flex flex-wrap gap-2 sm:col-span-2">
+              <button
+                className="bg-green-500 text-white px-4 py-2 rounded"
+                onClick={updateAnimal}
+              >
+                Save
+              </button>
+
+              <button
+                className="border px-4 py-2 rounded"
+                onClick={() => {
+                  setEditing(false)
+                  setImageFile(null)
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-start justify-between gap-3">
+              <h1 className="text-3xl font-bold mb-2 capitalize">
+                {getAnimalDisplayName()}
+              </h1>
+
+              <button
+                className="bg-blue-500 text-white px-3 py-2 rounded text-sm font-medium"
+                onClick={startEditing}
+              >
+                Edit
+              </button>
+            </div>
+
+            <p>Type: {animal.animal_type || 'Unknown'}</p>
+            <p>Breed: {animal.breed || 'Unknown'}</p>
+            <p>Gender: {animal.gender || 'Unknown'}</p>
+            <p>Color: {animal.color || 'Unknown'}</p>
+            <p>Band Number: {animal.band_number || 'None'}</p>
+            <p>Birth Date: {animal.birth_date || 'Unknown'}</p>
+            <p>Coop / Pasture: {animal.coops?.name || 'Not assigned'}</p>
+            <p>Notes: {animal.notes || 'None'}</p>
+          </>
+        )}
       </div>
 
       <div className="bg-white p-4 rounded-xl shadow mb-6">
